@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --background: #f7f9fb;
+  --surface: #ffffff;
+  --surface-muted: #eef1f5;
+  --foreground: #10151a;
+  --muted-foreground: #5b6672;
+  --border: #dde3ea;
+  --primary: #0f6e5f;
+  --primary-foreground: #ffffff;
+  --accent: #1c7ed6;
+  --critical: #d6336c;
+  --warning: #e8590c;
+  --success: #2b8a3e;
+  --info: #1c7ed6;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0b1116;
+  --surface: #121a21;
+  --surface-muted: #18222a;
+  --foreground: #e9eef2;
+  --muted-foreground: #93a1ad;
+  --border: #24313b;
+  --primary: #2fb897;
+  --primary-foreground: #06120e;
+  --accent: #4dabf7;
+  --critical: #ff6b9d;
+  --warning: #ffa94d;
+  --success: #69db7c;
+  --info: #4dabf7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-critical: var(--critical);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+    color: black;
+  }
+}
