@@ -22,6 +22,7 @@ create table if not exists edoslmis_supplier_catalog_items (
 );
 create index if not exists edoslmis_supplier_catalog_items_tenant_idx on edoslmis_supplier_catalog_items(tenant_id);
 create index if not exists edoslmis_supplier_catalog_items_supplier_idx on edoslmis_supplier_catalog_items(supplier_id);
+drop trigger if exists edoslmis_trg_supplier_catalog_items_updated_at on edoslmis_supplier_catalog_items;
 create trigger edoslmis_trg_supplier_catalog_items_updated_at
   before update on edoslmis_supplier_catalog_items
   for each row execute function edoslmis_set_updated_at();
