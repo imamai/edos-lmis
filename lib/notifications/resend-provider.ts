@@ -17,7 +17,8 @@ export const resendProvider: NotificationProvider = {
     }
 
     const resend = new Resend(apiKey);
-    const from = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    const fromAddress = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    const from = msg.fromName ? `${msg.fromName} <${fromAddress}>` : fromAddress;
 
     const { error } = await resend.emails.send({
       from,

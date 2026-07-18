@@ -16,6 +16,10 @@ export interface NotificationMessage {
   // the "from" address is a shared sending domain the recipient shouldn't
   // reply to directly.
   replyTo?: string;
+  // Display name shown alongside the "from" address, e.g. the tenant's
+  // clinic name, so recipients see "Acme Diagnostics <orders@...>" rather
+  // than the bare sending address.
+  fromName?: string;
 }
 
 export interface NotificationProvider {

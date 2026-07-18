@@ -225,6 +225,8 @@ export async function sendQuotation(quotationId: string) {
         subject: `Quotation ${quotation.quotation_number}`,
         message: `Please find attached Quotation ${quotation.quotation_number}${quotation.valid_until ? ` (valid until ${quotation.valid_until})` : ""}.`,
         attachment: { filename: `${quotation.quotation_number}.pdf`, content: pdf, contentType: "application/pdf" },
+        replyTo: settings.clinic_email ?? undefined,
+        fromName: settings.clinic_name ?? undefined,
       },
       { table: "edoslmis_quotations", id: quotationId }
     );
@@ -263,6 +265,8 @@ export async function resendQuotation(quotationId: string) {
       subject: `Revised Quotation ${quotation.quotation_number} — Rev. ${quotation.revision}`,
       message: `Please find attached a revised version (Rev. ${quotation.revision}) of Quotation ${quotation.quotation_number}, superseding the version sent earlier.`,
       attachment: { filename: `${quotation.quotation_number}-rev${quotation.revision}.pdf`, content: pdf, contentType: "application/pdf" },
+      replyTo: settings.clinic_email ?? undefined,
+      fromName: settings.clinic_name ?? undefined,
     },
     { table: "edoslmis_quotations", id: quotationId }
   );

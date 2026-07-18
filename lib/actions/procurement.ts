@@ -332,6 +332,7 @@ export async function sendPurchaseOrder(poId: string) {
         message: `Please find attached Purchase Order ${po.po_number}${po.expected_date ? ` (expected ${po.expected_date})` : ""}.`,
         attachment: { filename: `${po.po_number}.pdf`, content: pdf, contentType: "application/pdf" },
         replyTo: settings.clinic_email ?? undefined,
+        fromName: settings.clinic_name ?? undefined,
       },
       { table: "edoslmis_purchase_orders", id: poId }
     );
@@ -376,6 +377,7 @@ export async function resendPurchaseOrder(poId: string) {
       message: `Please find attached a revised version (Rev. ${po.revision}) of Purchase Order ${po.po_number}, superseding the version sent earlier.`,
       attachment: { filename: `${po.po_number}-rev${po.revision}.pdf`, content: pdf, contentType: "application/pdf" },
       replyTo: settings.clinic_email ?? undefined,
+      fromName: settings.clinic_name ?? undefined,
     },
     { table: "edoslmis_purchase_orders", id: poId }
   );
@@ -590,6 +592,7 @@ export async function sendRfq(rfqId: string) {
         message: `Please find attached Request for Quotation ${rfq.rfq_number}${rfq.expected_date ? ` (needed by ${rfq.expected_date})` : ""}.`,
         attachment: { filename: `${rfq.rfq_number}.pdf`, content: pdf, contentType: "application/pdf" },
         replyTo: settings.clinic_email ?? undefined,
+        fromName: settings.clinic_name ?? undefined,
       },
       { table: "edoslmis_rfqs", id: rfqId }
     );
@@ -639,6 +642,7 @@ export async function resendRfq(rfqId: string) {
         message: `Please find attached a revised version (Rev. ${rfq.revision}) of Request for Quotation ${rfq.rfq_number}, superseding the version sent earlier.`,
         attachment: { filename: `${rfq.rfq_number}-rev${rfq.revision}.pdf`, content: pdf, contentType: "application/pdf" },
         replyTo: settings.clinic_email ?? undefined,
+        fromName: settings.clinic_name ?? undefined,
       },
       { table: "edoslmis_rfqs", id: rfqId }
     );
