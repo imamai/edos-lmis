@@ -106,7 +106,11 @@ $$;
 grant execute on function edoslmis_set_user_permission_overrides(uuid, text[]) to authenticated;
 
 -- Extend the staff list RPC to also return each user's custom permission
--- overrides (same zero-arg signature as 0029 — a true replace).
+-- overrides. CREATE OR REPLACE can't change a RETURNS TABLE column list
+-- (the OUT-parameter row type is part of the signature, unlike the function
+-- body) — adding custom_permissions requires dropping the old 5-column
+-- version first.
+drop function if exists edoslmis_list_staff_with_roles();
 create or replace function edoslmis_list_staff_with_roles()
 returns table (
   user_id uuid,
