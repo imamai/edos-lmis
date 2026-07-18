@@ -26,7 +26,7 @@ export function SendPoButton({ poId }: { poId: string }) {
               result.emailed
                 ? `Emailed to ${result.supplierEmail}`
                 : result.supplierEmail
-                  ? "Marked as sent — email delivery isn't wired in yet, send the PDF manually."
+                  ? `Marked as sent — email failed (${result.emailError ?? "unknown error"}), send the PDF manually.`
                   : "Marked as sent — no supplier email on file, send the PDF manually."
             );
             router.refresh();

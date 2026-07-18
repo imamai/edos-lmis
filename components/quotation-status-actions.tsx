@@ -30,7 +30,7 @@ export function QuotationStatusActions({ quotationId, status }: { quotationId: s
         result.emailed
           ? `Emailed to ${result.customerEmail}`
           : result.customerEmail
-            ? "Marked as sent — email delivery isn't wired in yet, send the PDF manually."
+            ? `Marked as sent — email failed (${result.emailError ?? "unknown error"}), send the PDF manually.`
             : "Marked as sent — no customer email on file, send the PDF manually."
       );
       router.refresh();

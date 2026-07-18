@@ -22,7 +22,10 @@ export function RfqSendButton({ rfqId }: { rfqId: string }) {
               setError(result.error);
               return;
             }
-            setNotice(`Emailed ${result.emailedCount} of ${result.supplierCount} supplier(s).`);
+            setNotice(
+              `Emailed ${result.emailedCount} of ${result.supplierCount} supplier(s).` +
+                (result.emailError ? ` Failure reason: ${result.emailError}` : "")
+            );
             router.refresh();
           })
         }

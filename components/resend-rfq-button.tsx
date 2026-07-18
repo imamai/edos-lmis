@@ -23,7 +23,10 @@ export function ResendRfqButton({ rfqId }: { rfqId: string }) {
               setError(result.error);
               return;
             }
-            setNotice(`Revised RFQ emailed to ${result.emailedCount} of ${result.supplierCount} supplier(s).`);
+            setNotice(
+              `Revised RFQ emailed to ${result.emailedCount} of ${result.supplierCount} supplier(s).` +
+                (result.emailError ? ` Failure reason: ${result.emailError}` : "")
+            );
             router.refresh();
           })
         }

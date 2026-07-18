@@ -319,6 +319,7 @@ export async function sendPurchaseOrder(poId: string) {
   if (!po) return { error: "Purchase order not found." };
 
   let emailed = false;
+  let emailError: string | null = null;
   if (po.supplier?.email) {
     const settings = await getTenantSettings(staff.tenantId);
     const pdf = await renderPdf(createElement(PurchaseOrderDocument, { po, settings }));
@@ -335,6 +336,7 @@ export async function sendPurchaseOrder(poId: string) {
       { table: "edoslmis_purchase_orders", id: poId }
     );
     emailed = result.ok;
+    if (!result.ok) emailError = result.error ?? "Failed to send email.";
   }
 
   const { error } = await supabase
@@ -349,6 +351,7 @@ export async function sendPurchaseOrder(poId: string) {
   return {
     error: null,
     emailed,
+    emailError,
     supplierEmail: po.supplier?.email ?? null,
   };
 }
@@ -575,6 +578,7 @@ export async function sendRfq(rfqId: string) {
   const pdf = await renderPdf(createElement(RfqDocument, { rfq, settings }));
 
   let emailedCount = 0;
+  let emailError: string | null = null;
   for (const entry of rfq.suppliers) {
     if (!entry.supplier?.email) continue;
     const result = await sendNotification(
@@ -590,6 +594,7 @@ export async function sendRfq(rfqId: string) {
       { table: "edoslmis_rfqs", id: rfqId }
     );
     if (result.ok) emailedCount++;
+    else if (!emailError) emailError = result.error ?? "Failed to send email.";
   }
 
   const { error: markSentError } = await supabase
@@ -607,7 +612,7 @@ export async function sendRfq(rfqId: string) {
 
   revalidatePath(`/rfqs/${rfqId}`);
   revalidatePath("/rfqs");
-  return { error: null, emailedCount, supplierCount: rfq.suppliers.length };
+  return { error: null, emailedCount, emailError, supplierCount: rfq.suppliers.length };
 }
 
 export async function resendRfq(rfqId: string) {
@@ -622,6 +627,7 @@ export async function resendRfq(rfqId: string) {
   const pdf = await renderPdf(createElement(RfqDocument, { rfq, settings }));
 
   let emailedCount = 0;
+  let emailError: string | null = null;
   for (const entry of rfq.suppliers) {
     if (!entry.supplier?.email) continue;
     const result = await sendNotification(
@@ -637,9 +643,10 @@ export async function resendRfq(rfqId: string) {
       { table: "edoslmis_rfqs", id: rfqId }
     );
     if (result.ok) emailedCount++;
+    else if (!emailError) emailError = result.error ?? "Failed to send email.";
   }
 
-  return { error: null, emailedCount, supplierCount: rfq.suppliers.length };
+  return { error: null, emailedCount, emailError, supplierCount: rfq.suppliers.length };
 }
 
 export async function recordRfqResponse(_prevState: { error: string | null } | null, formData: FormData) {

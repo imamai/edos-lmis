@@ -213,6 +213,7 @@ export async function sendQuotation(quotationId: string) {
   if (!quotation) return { error: "Quotation not found." };
 
   let emailed = false;
+  let emailError: string | null = null;
   if (quotation.customer_email) {
     const settings = await getTenantSettings(staff.tenantId);
     const pdf = await renderPdf(createElement(QuotationDocument, { quotation, settings }));
@@ -228,6 +229,7 @@ export async function sendQuotation(quotationId: string) {
       { table: "edoslmis_quotations", id: quotationId }
     );
     emailed = result.ok;
+    if (!result.ok) emailError = result.error ?? "Failed to send email.";
   }
 
   const { error } = await supabase
@@ -239,7 +241,7 @@ export async function sendQuotation(quotationId: string) {
 
   revalidatePath(`/quotations/${quotationId}`);
   revalidatePath("/quotations");
-  return { error: null, emailed, customerEmail: quotation.customer_email };
+  return { error: null, emailed, emailError, customerEmail: quotation.customer_email };
 }
 
 export async function resendQuotation(quotationId: string) {

@@ -27,6 +27,7 @@ export async function sendNotification(
     message: msg.message,
     status: result.ok ? "sent" : "failed",
     provider: provider.name,
+    error_message: result.ok ? null : (result.error ?? null),
     related_table: related?.table ?? null,
     related_id: related?.id ?? null,
   });
