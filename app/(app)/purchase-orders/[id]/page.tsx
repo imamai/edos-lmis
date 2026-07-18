@@ -110,11 +110,11 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
         {canResend && <ResendPoButton poId={po.id} />}
         {canCancel && <CancelPoButton poId={po.id} />}
         {canDownloadGrn && (
-          <a href={`/api/purchase-orders/${po.id}/grn-pdf?download=1`} target="_blank" rel="noopener noreferrer">
+          <Link href={`/purchase-orders/${po.id}/grn`}>
             <Button variant="outline">
               <FileText size={16} /> Goods Received Note
             </Button>
-          </a>
+          </Link>
         )}
         {canGenerateBill && (
           existingBill ? (
