@@ -12,6 +12,10 @@ export interface NotificationMessage {
   subject?: string;
   message: string;
   attachment?: NotificationAttachment;
+  // Where a reply should land — e.g. the tenant's own clinic_email — since
+  // the "from" address is a shared sending domain the recipient shouldn't
+  // reply to directly.
+  replyTo?: string;
 }
 
 export interface NotificationProvider {

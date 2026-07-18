@@ -144,6 +144,46 @@ export async function setSupplierActive(supplierId: string, isActive: boolean) {
   return { error: null };
 }
 
+export async function createSupplierCatalogItem(_prevState: { error: string | null } | null, formData: FormData) {
+  const staff = await getCurrentStaff();
+  const supabase = await createClient();
+
+  const supplierId = String(formData.get("supplier_id") ?? "");
+  const itemId = String(formData.get("item_id") ?? "");
+  const unitPrice = Number(formData.get("unit_price") ?? 0);
+  if (!supplierId || !itemId || unitPrice <= 0) {
+    return { error: "Select a commodity and enter a price greater than zero." };
+  }
+
+  const { error } = await supabase.from("edoslmis_supplier_catalog_items").upsert(
+    {
+      tenant_id: staff.tenantId,
+      supplier_id: supplierId,
+      item_id: itemId,
+      unit_price: unitPrice,
+      supplier_sku: String(formData.get("supplier_sku") ?? "").trim() || null,
+      notes: String(formData.get("notes") ?? "").trim() || null,
+      created_by: staff.userId,
+    },
+    { onConflict: "tenant_id,supplier_id,item_id" }
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/suppliers/${supplierId}`);
+  return { error: null };
+}
+
+export async function deleteSupplierCatalogItem(catalogItemId: string, supplierId: string) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("edoslmis_supplier_catalog_items").delete().eq("id", catalogItemId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/suppliers/${supplierId}`);
+  return { error: null };
+}
+
 export async function createPurchaseOrder(_prevState: { error: string } | null, formData: FormData) {
   const staff = await getCurrentStaff();
   const supabase = await createClient();
@@ -290,6 +330,7 @@ export async function sendPurchaseOrder(poId: string) {
         subject: `Purchase Order ${po.po_number}`,
         message: `Please find attached Purchase Order ${po.po_number}${po.expected_date ? ` (expected ${po.expected_date})` : ""}.`,
         attachment: { filename: `${po.po_number}.pdf`, content: pdf, contentType: "application/pdf" },
+        replyTo: settings.clinic_email ?? undefined,
       },
       { table: "edoslmis_purchase_orders", id: poId }
     );
@@ -331,6 +372,7 @@ export async function resendPurchaseOrder(poId: string) {
       subject: `Revised Purchase Order ${po.po_number} — Rev. ${po.revision}`,
       message: `Please find attached a revised version (Rev. ${po.revision}) of Purchase Order ${po.po_number}, superseding the version sent earlier.`,
       attachment: { filename: `${po.po_number}-rev${po.revision}.pdf`, content: pdf, contentType: "application/pdf" },
+      replyTo: settings.clinic_email ?? undefined,
     },
     { table: "edoslmis_purchase_orders", id: poId }
   );
@@ -543,6 +585,7 @@ export async function sendRfq(rfqId: string) {
         subject: `Request for Quotation ${rfq.rfq_number}`,
         message: `Please find attached Request for Quotation ${rfq.rfq_number}${rfq.expected_date ? ` (needed by ${rfq.expected_date})` : ""}.`,
         attachment: { filename: `${rfq.rfq_number}.pdf`, content: pdf, contentType: "application/pdf" },
+        replyTo: settings.clinic_email ?? undefined,
       },
       { table: "edoslmis_rfqs", id: rfqId }
     );
@@ -589,6 +632,7 @@ export async function resendRfq(rfqId: string) {
         subject: `Revised Request for Quotation ${rfq.rfq_number} — Rev. ${rfq.revision}`,
         message: `Please find attached a revised version (Rev. ${rfq.revision}) of Request for Quotation ${rfq.rfq_number}, superseding the version sent earlier.`,
         attachment: { filename: `${rfq.rfq_number}-rev${rfq.revision}.pdf`, content: pdf, contentType: "application/pdf" },
+        replyTo: settings.clinic_email ?? undefined,
       },
       { table: "edoslmis_rfqs", id: rfqId }
     );

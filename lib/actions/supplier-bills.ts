@@ -51,6 +51,43 @@ export async function recordSupplierPayment(
   return { error: null };
 }
 
+export async function recordBulkSupplierPayments(
+  _prevState: { error: string | null } | null,
+  formData: FormData
+) {
+  const billIds = formData.getAll("bill_id").map(String).filter(Boolean);
+  const paymentMethod = String(formData.get("payment_method") ?? "");
+  const referenceNumber = String(formData.get("reference_number") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (billIds.length === 0) return { error: "Select at least one bill." };
+  if (!paymentMethod) return { error: "Choose a payment method." };
+
+  const amounts: number[] = [];
+  for (const billId of billIds) {
+    const amount = Number(formData.get(`amount__${billId}`) ?? 0);
+    if (!amount || amount <= 0) return { error: "Enter a positive amount for every selected bill." };
+    amounts.push(amount);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("edoslmis_record_bulk_supplier_payments", {
+    p_bill_ids: billIds,
+    p_amounts: amounts,
+    p_payment_method: paymentMethod,
+    p_reference_number: referenceNumber,
+    p_notes: notes,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/supplier-bills");
+  revalidatePath("/supplier-bills/pay");
+  revalidatePath("/dashboard");
+  for (const billId of billIds) revalidatePath(`/supplier-bills/${billId}`);
+  return { error: null };
+}
+
 export async function updateSupplierBillSupplierInvoiceNumber(
   _prevState: { error: string | null } | null,
   formData: FormData

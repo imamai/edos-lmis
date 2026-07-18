@@ -33,6 +33,66 @@ export async function getSupplier(id: string): Promise<Supplier | null> {
   return data ?? null;
 }
 
+export type SupplierCatalogItem = {
+  id: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unitOfMeasure: string;
+  unitPrice: number;
+  supplierSku: string | null;
+  notes: string | null;
+};
+
+export async function getSupplierCatalog(supplierId: string): Promise<SupplierCatalogItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("edoslmis_supplier_catalog_items")
+    .select(
+      "id, item_id, unit_price, supplier_sku, notes, edoslmis_inventory_items(code, name, unit_of_measure)"
+    )
+    .eq("supplier_id", supplierId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("getSupplierCatalog: query failed", error);
+    return [];
+  }
+  return (data ?? []).map((row) => {
+    const item = row.edoslmis_inventory_items as unknown as { code: string; name: string; unit_of_measure: string } | null;
+    return {
+      id: row.id,
+      itemId: row.item_id,
+      itemCode: item?.code ?? "",
+      itemName: item?.name ?? "Unknown item",
+      unitOfMeasure: item?.unit_of_measure ?? "unit",
+      unitPrice: Number(row.unit_price),
+      supplierSku: row.supplier_sku,
+      notes: row.notes,
+    };
+  });
+}
+
+export type SupplierCatalogPriceEntry = { supplierId: string; itemId: string; unitPrice: number };
+
+/**
+ * Flat, tenant-wide catalogue price list handed to the PO form so it can
+ * look up "does the selected supplier have a price for this item" entirely
+ * client-side as the supplier selection changes, without a round trip.
+ */
+export async function getAllSupplierCatalogPrices(): Promise<SupplierCatalogPriceEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("edoslmis_supplier_catalog_items").select("supplier_id, item_id, unit_price");
+  if (error) {
+    console.error("getAllSupplierCatalogPrices: query failed", error);
+    return [];
+  }
+  return (data ?? []).map((row) => ({
+    supplierId: row.supplier_id,
+    itemId: row.item_id,
+    unitPrice: Number(row.unit_price),
+  }));
+}
+
 export type PurchaseOrderListRow = {
   id: string;
   po_number: string;

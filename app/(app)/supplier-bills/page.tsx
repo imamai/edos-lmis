@@ -1,6 +1,7 @@
 import { getSupplierBills } from "@/lib/data/supplier-bills";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 const statusTone: Record<string, "neutral" | "warning" | "info" | "success" | "critical"> = {
@@ -15,9 +16,14 @@ export default async function SupplierBillsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Supplier Bills</h1>
-        <p className="text-sm text-muted-foreground">Money owed to suppliers, generated from received purchase orders</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Supplier Bills</h1>
+          <p className="text-sm text-muted-foreground">Money owed to suppliers, generated from received purchase orders</p>
+        </div>
+        <Link href="/supplier-bills/pay">
+          <Button variant="secondary">Pay Bills</Button>
+        </Link>
       </div>
 
       <Card className="overflow-hidden">

@@ -124,6 +124,44 @@ export async function getSupplierBill(id: string): Promise<{ data: SupplierBillD
   };
 }
 
+export type OutstandingSupplierBill = {
+  id: string;
+  bill_number: string;
+  bill_date: string;
+  total_amount: number;
+  amount_paid: number;
+  balance_due: number;
+  status: string;
+};
+
+/**
+ * Unpaid/partially-paid bills for a single supplier — the list the bulk
+ * payment picker checks off. Never includes cancelled or fully-paid bills.
+ */
+export async function getOutstandingSupplierBills(supplierId: string): Promise<OutstandingSupplierBill[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("edoslmis_supplier_bills")
+    .select("id, bill_number, bill_date, total_amount, amount_paid, balance_due, status")
+    .eq("supplier_id", supplierId)
+    .in("status", ["issued", "partially_paid"])
+    .gt("balance_due", 0)
+    .order("bill_date", { ascending: true });
+  if (error) {
+    console.error("getOutstandingSupplierBills: query failed", error);
+    return [];
+  }
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    bill_number: b.bill_number,
+    bill_date: b.bill_date,
+    total_amount: Number(b.total_amount),
+    amount_paid: Number(b.amount_paid),
+    balance_due: Number(b.balance_due),
+    status: b.status,
+  }));
+}
+
 export async function getSupplierBillByPoId(poId: string): Promise<{ id: string } | null> {
   const supabase = await createClient();
   const { data } = await supabase

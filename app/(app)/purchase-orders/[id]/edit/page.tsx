@@ -1,13 +1,14 @@
-import { getPurchaseOrder, getSuppliers, getProcurableItems } from "@/lib/data/procurement";
+import { getPurchaseOrder, getSuppliers, getProcurableItems, getAllSupplierCatalogPrices } from "@/lib/data/procurement";
 import { PurchaseOrderForm } from "@/components/purchase-order-form";
 import { notFound } from "next/navigation";
 
 export default async function EditPurchaseOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ data: po, error: poError }, { data: suppliers }, items] = await Promise.all([
+  const [{ data: po, error: poError }, { data: suppliers }, items, catalogPrices] = await Promise.all([
     getPurchaseOrder(id),
     getSuppliers(),
     getProcurableItems(),
+    getAllSupplierCatalogPrices(),
   ]);
 
   if (poError) {
@@ -34,6 +35,7 @@ export default async function EditPurchaseOrderPage({ params }: { params: Promis
       <PurchaseOrderForm
         suppliers={suppliers.filter((s) => s.is_active)}
         items={items}
+        catalogPrices={catalogPrices}
         existingPo={{
           id: po.id,
           supplier_id: po.supplier?.id ?? "",

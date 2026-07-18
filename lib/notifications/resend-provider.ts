@@ -24,6 +24,7 @@ export const resendProvider: NotificationProvider = {
       to: msg.recipient,
       subject: msg.subject || "Notification",
       text: msg.message,
+      replyTo: msg.replyTo || undefined,
       attachments: msg.attachment
         ? [{ filename: msg.attachment.filename, content: msg.attachment.content }]
         : undefined,
