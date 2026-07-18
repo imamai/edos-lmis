@@ -26,6 +26,10 @@ export async function saveDailyLabStockChecks(_prevState: { error: string | null
     // When not a deliberate override, always persist the freshly-derived ledger
     // value (ignore whatever the client happened to submit) so this date keeps
     // tracking live even if a later ledger correction changes the auto figure.
+    // Manual-tracking commodities are deducted via Record Stock Movement
+    // (manual_usage transactions) instead, so their Quantity Used is just as
+    // ledger-derived as an order-driven item's — this override is a display
+    // annotation only, same as it's always been, and never writes the ledger.
     const quantityUsed = quantityUsedIsManual
       ? Number(formData.get(`quantity_used__${itemId}`) ?? 0) || 0
       : prefill?.quantityUsed ?? 0;

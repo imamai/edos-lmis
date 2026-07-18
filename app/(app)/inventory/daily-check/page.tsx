@@ -19,7 +19,7 @@ export default async function DailyCheckPage({
   const supabase = await createClient();
   const { data: items } = await supabase
     .from("edoslmis_inventory_items")
-    .select("id, code, name, unit_of_measure, reorder_level")
+    .select("id, code, name, unit_of_measure, reorder_level, tracking_mode")
     .eq("is_active", true)
     .order("name");
 
@@ -58,6 +58,7 @@ export default async function DailyCheckPage({
       code: item.code,
       name: item.name,
       unitOfMeasure: item.unit_of_measure,
+      trackingMode: item.tracking_mode,
       auto: {
         beginningBalance,
         qtyReceived,
@@ -99,7 +100,10 @@ export default async function DailyCheckPage({
           <h1 className="text-xl font-semibold text-foreground">Daily Lab Stock Check</h1>
           <p className="text-sm text-muted-foreground">
             Beginning balance, receipts, usage, wastage, and adjustments are auto-populated from stock records
-            for the selected day — confirm the physical count and fill in the rest.
+            for the selected day — confirm the physical count and fill in the rest. Commodities badged{" "}
+            <span className="font-medium text-foreground">Manual entry</span> are deducted via Record Stock
+            Movement on their item page instead of through Orders → Results, but otherwise reconcile here the
+            same way.
           </p>
         </div>
         <form className="flex items-end gap-2">

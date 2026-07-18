@@ -26,6 +26,7 @@ export async function createInventoryItem(_prevState: { error: string } | null, 
       name,
       unit_of_measure: String(formData.get("unit_of_measure") ?? "unit"),
       reorder_level: Number(formData.get("reorder_level") ?? 0),
+      tracking_mode: String(formData.get("tracking_mode") ?? "order_driven"),
       created_by: staff.userId,
     })
     .select("id")
@@ -51,6 +52,7 @@ export async function createInventoryItem(_prevState: { error: string } | null, 
 
 const adjustmentTypeForDirection: Record<string, string> = {
   receipt: "receipt",
+  manual_usage: "manual_usage",
   positive_adjustment: "positive_adjustment",
   negative_adjustment: "negative_adjustment",
   wastage: "wastage",
@@ -66,6 +68,7 @@ export async function recordStockMovement(
   const type = String(formData.get("transaction_type") ?? "");
   const quantity = Number(formData.get("quantity") ?? 0);
   const notes = String(formData.get("notes") ?? "").trim() || null;
+  const date = String(formData.get("performed_at") ?? "").trim() || null;
 
   if (!itemId || !type || !quantity) {
     return { error: "Select a movement type and enter a non-zero quantity." };
@@ -74,7 +77,7 @@ export async function recordStockMovement(
   const resolvedType = adjustmentTypeForDirection[type];
   if (!resolvedType) return { error: "Invalid movement type." };
 
-  const isOutbound = ["negative_adjustment", "wastage", "expiry"].includes(resolvedType);
+  const isOutbound = ["negative_adjustment", "wastage", "expiry", "manual_usage"].includes(resolvedType);
   // Stock count correction can go either way (a physical count can come in
   // over or under what the ledger expects) — respect whatever sign was
   // entered instead of always forcing it positive.
@@ -89,6 +92,7 @@ export async function recordStockMovement(
     p_batch_id: null,
     p_reference_order_test_id: null,
     p_notes: notes,
+    p_performed_at: date,
   });
 
   if (error) return { error: error.message };
@@ -145,7 +149,7 @@ export async function postStockCountCorrection(itemId: string, checkDate: string
   return { error: null };
 }
 
-const outboundStockTransactionTypes = new Set(["negative_adjustment", "wastage", "expiry"]);
+const outboundStockTransactionTypes = new Set(["negative_adjustment", "wastage", "expiry", "manual_usage"]);
 
 export async function updateStockTransaction(
   _prevState: { error: string | null } | null,
@@ -215,6 +219,7 @@ export async function updateInventoryItem(_prevState: { error: string } | null, 
       name,
       unit_of_measure: String(formData.get("unit_of_measure") ?? "unit"),
       reorder_level: Number(formData.get("reorder_level") ?? 0),
+      tracking_mode: String(formData.get("tracking_mode") ?? "order_driven"),
     })
     .eq("id", itemId);
 
@@ -252,5 +257,54 @@ export async function setInventoryItemActive(itemId: string, isActive: boolean) 
 
   revalidatePath(`/inventory/${itemId}`);
   revalidatePath("/inventory");
+  return { error: null };
+}
+
+export async function updateStockBatch(_prevState: { error: string | null } | null, formData: FormData) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const batchId = String(formData.get("batch_id") ?? "");
+  const itemId = String(formData.get("item_id") ?? "");
+  const batchNumber = String(formData.get("batch_number") ?? "").trim();
+  if (!batchId || !batchNumber) return { error: "Batch number is required." };
+
+  const supplierName = String(formData.get("supplier_name") ?? "").trim() || null;
+  const expiryDate = String(formData.get("expiry_date") ?? "").trim() || null;
+  const unitCostRaw = String(formData.get("unit_cost") ?? "").trim();
+  const unitCost = unitCostRaw === "" ? null : Number(unitCostRaw);
+  const quantityRemaining = Number(formData.get("quantity_remaining") ?? 0);
+
+  if (quantityRemaining < 0) return { error: "Quantity remaining can't be negative." };
+
+  const { error } = await supabase
+    .from("edoslmis_stock_batches")
+    .update({
+      batch_number: batchNumber,
+      supplier_name: supplierName,
+      expiry_date: expiryDate,
+      unit_cost: unitCost,
+      quantity_remaining: quantityRemaining,
+    })
+    .eq("id", batchId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/inventory/${itemId}`);
+  revalidatePath("/inventory/daily-check");
+  revalidatePath("/reports/lab-stock");
+  return { error: null };
+}
+
+export async function setStockBatchActive(batchId: string, itemId: string, isActive: boolean) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("edoslmis_stock_batches").update({ is_active: isActive }).eq("id", batchId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/inventory/${itemId}`);
+  revalidatePath("/inventory/daily-check");
+  revalidatePath("/reports/lab-stock");
   return { error: null };
 }

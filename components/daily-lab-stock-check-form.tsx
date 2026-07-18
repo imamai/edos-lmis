@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { saveDailyLabStockChecks } from "@/lib/actions/lab-stock-checks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { PostStockCorrectionButton } from "@/components/post-stock-correction-button";
 
 export type DailyCheckRow = {
@@ -11,6 +12,7 @@ export type DailyCheckRow = {
   code: string;
   name: string;
   unitOfMeasure: string;
+  trackingMode: string;
   auto: {
     beginningBalance: number;
     qtyReceived: number;
@@ -57,6 +59,15 @@ function DailyCheckTableRow({ row, date }: { row: DailyCheckRow; date: string })
     <tr className="border-t border-border">
       <td className="px-3 py-2 font-medium text-foreground">
         {row.name} <span className="text-muted-foreground">({row.code})</span>
+        {row.trackingMode === "manual_entry" && (
+          <Badge
+            tone="info"
+            className="ml-2"
+            title="Tracked via Record Stock Movement (manual usage), not Orders → Results. Quantity Used here is auto-derived from that ledger, same as an order-driven item's."
+          >
+            Manual entry
+          </Badge>
+        )}
       </td>
       <td className="px-3 py-2 text-muted-foreground" title="Auto-derived from the stock ledger">
         {fmt(row.auto.beginningBalance)}

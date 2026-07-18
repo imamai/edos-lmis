@@ -136,6 +136,7 @@ export async function getDailyCheckPrefill(
         f.other += qty;
         break;
       case "test_usage":
+      case "manual_usage":
         f.used += qty;
         break;
       case "transfer_out":
@@ -231,6 +232,128 @@ export async function getSavedChecksForDate(itemIds: string[], date: string): Pr
     });
   }
   return result;
+}
+
+export type EstimatedManualRevenueLine = {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  category: string;
+  testName: string;
+  quantityUsed: number;
+  unitPrice: number;
+  amount: number;
+};
+
+export type EstimatedManualRevenueByCategory = {
+  category: string;
+  amount: number;
+  lines: EstimatedManualRevenueLine[];
+};
+
+export type EstimatedManualRevenue = {
+  amount: number;
+  itemsIncluded: number;
+  itemsExcluded: number;
+  byCategory: EstimatedManualRevenueByCategory[];
+};
+
+/**
+ * Manual-entry commodities have no patient, order, or test attached — only a
+ * raw quantity posted against a reagent via Record Stock Movement — so
+ * there's no way to generate a real, chargeable invoice from them. This is a
+ * display-only estimate for the dashboard: quantity deducted via
+ * manual_usage ledger transactions x the price of whichever single test
+ * consumes that reagent, ONLY for commodities that map to exactly one test in
+ * edoslmis_test_reagent_usage. Commodities used by zero or multiple tests are
+ * excluded (ambiguous which test to price it as) and counted in
+ * itemsExcluded so the dashboard can disclose the estimate isn't exhaustive.
+ * Reading straight from the ledger (rather than the Daily Stock Check report
+ * table) means this is complete regardless of whether anyone ever opens the
+ * Daily Check page for the item/date in question. Broken down by inventory
+ * category (the grouping already built into the commodity model) so the
+ * estimate reads as "per commodity / per test / per category", not one
+ * undifferentiated number. This never touches
+ * edoslmis_invoices/edoslmis_payments — real revenue figures are computed
+ * exactly as before.
+ */
+export async function getEstimatedManualRevenue(from: string, to: string): Promise<EstimatedManualRevenue> {
+  const supabase = await createClient();
+
+  const { data: manualItems } = await supabase
+    .from("edoslmis_inventory_items")
+    .select("id, code, name, category")
+    .eq("is_active", true)
+    .eq("tracking_mode", "manual_entry");
+  const items = manualItems ?? [];
+  const manualItemIds = items.map((i) => i.id as string);
+  if (manualItemIds.length === 0) return { amount: 0, itemsIncluded: 0, itemsExcluded: 0, byCategory: [] };
+
+  const { data: usageRows } = await supabase
+    .from("edoslmis_test_reagent_usage")
+    .select("item_id, test_id, edoslmis_tests(name, price)")
+    .in("item_id", manualItemIds);
+
+  const testsByItem = new Map<string, Set<string>>();
+  const testInfoByItem = new Map<string, { testName: string; unitPrice: number }>();
+  for (const row of usageRows ?? []) {
+    const set = testsByItem.get(row.item_id) ?? new Set<string>();
+    set.add(row.test_id);
+    testsByItem.set(row.item_id, set);
+    const test = row.edoslmis_tests as unknown as { name: string; price: number } | { name: string; price: number }[] | null;
+    const t = Array.isArray(test) ? test[0] : test;
+    testInfoByItem.set(row.item_id, { testName: t?.name ?? "-", unitPrice: Number(t?.price ?? 0) });
+  }
+
+  const eligibleItemIds = manualItemIds.filter((id) => testsByItem.get(id)?.size === 1);
+  const itemsExcluded = manualItemIds.length - eligibleItemIds.length;
+  if (eligibleItemIds.length === 0) return { amount: 0, itemsIncluded: 0, itemsExcluded, byCategory: [] };
+
+  const { data: usageTx } = await supabase
+    .from("edoslmis_stock_transactions")
+    .select("item_id, quantity_change")
+    .in("item_id", eligibleItemIds)
+    .eq("transaction_type", "manual_usage")
+    .gte("performed_at", `${from}T00:00:00.000Z`)
+    .lt("performed_at", `${addDaysStr(to, 1)}T00:00:00.000Z`);
+
+  const quantityUsedByItem = new Map<string, number>();
+  for (const row of usageTx ?? []) {
+    quantityUsedByItem.set(row.item_id, (quantityUsedByItem.get(row.item_id) ?? 0) + Math.abs(Number(row.quantity_change)));
+  }
+
+  const categoryMap = new Map<string, EstimatedManualRevenueByCategory>();
+  let amount = 0;
+  for (const item of items) {
+    if (!eligibleItemIds.includes(item.id)) continue;
+    const quantityUsed = quantityUsedByItem.get(item.id) ?? 0;
+    if (quantityUsed <= 0) continue;
+
+    const { testName, unitPrice } = testInfoByItem.get(item.id) ?? { testName: "-", unitPrice: 0 };
+    const lineAmount = quantityUsed * unitPrice;
+    amount += lineAmount;
+
+    const bucket: EstimatedManualRevenueByCategory =
+      categoryMap.get(item.category) ?? { category: item.category, amount: 0, lines: [] };
+    bucket.amount += lineAmount;
+    bucket.lines.push({
+      itemId: item.id,
+      itemCode: item.code,
+      itemName: item.name,
+      category: item.category,
+      testName,
+      quantityUsed,
+      unitPrice,
+      amount: lineAmount,
+    });
+    categoryMap.set(item.category, bucket);
+  }
+
+  const byCategory = [...categoryMap.values()]
+    .map((bucket) => ({ ...bucket, lines: bucket.lines.sort((a, b) => b.amount - a.amount) }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return { amount, itemsIncluded: eligibleItemIds.length, itemsExcluded, byCategory };
 }
 
 export type LabStockReportRow = {

@@ -10,7 +10,7 @@ export default async function EditInventoryItemPage({ params }: { params: Promis
   const [{ data: item }, { data: departments }, categories] = await Promise.all([
     supabase
       .from("edoslmis_inventory_items")
-      .select("id, code, name, category, unit_of_measure, reorder_level, department_id")
+      .select("id, code, name, category, unit_of_measure, reorder_level, department_id, tracking_mode")
       .eq("id", id)
       .single(),
     supabase.from("edoslmis_departments").select("id, name").eq("is_active", true).order("name"),

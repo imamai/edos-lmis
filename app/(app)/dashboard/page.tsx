@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { SampleTrendChart } from "@/components/sample-trend-chart";
 import { ClearFiltersButton } from "@/components/clear-filters-button";
 import { getDictionary } from "@/lib/i18n/get-locale";
-import { todayStr, startOfWeekStr, startOfMonthStr, addDaysStr } from "@/lib/data/lab-stock-checks";
+import { todayStr, startOfWeekStr, startOfMonthStr, addDaysStr, getEstimatedManualRevenue } from "@/lib/data/lab-stock-checks";
 import {
   TestTube2,
   Clock,
@@ -22,6 +23,7 @@ import {
   Banknote,
   Wallet,
   FlaskRound,
+  Calculator,
 } from "lucide-react";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -86,13 +88,14 @@ async function getStats(from: string, to: string) {
       .eq("status", "out_of_service"),
   ]);
 
-  const [paymentsPeriod, outstandingInvoices] = await Promise.all([
+  const [paymentsPeriod, outstandingInvoices, estimatedManualRevenue] = await Promise.all([
     supabase.from("edoslmis_payments").select("amount").gte("paid_at", fromIso).lt("paid_at", toIso),
     supabase
       .from("edoslmis_invoices")
       .select("balance_due")
       .gt("balance_due", 0)
       .not("status", "in", "(cancelled,written_off)"),
+    getEstimatedManualRevenue(from, to),
   ]);
   const revenuePeriod = (paymentsPeriod.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
   const outstandingBalance = (outstandingInvoices.data ?? []).reduce((sum, i) => sum + Number(i.balance_due), 0);
@@ -161,6 +164,7 @@ async function getStats(from: string, to: string) {
     equipmentDownCount: equipmentDown.count ?? 0,
     revenuePeriod,
     outstandingBalance,
+    estimatedManualRevenue,
     qcRejectedCount: qcRejectedCount ?? 0,
     trendLabels: labels,
     trendValues: values,
@@ -270,9 +274,15 @@ export default async function DashboardPage({
         <StatCard label={t.ordersToday} value={stats.periodOrders} icon={ClipboardList} tone="success" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={t.revenueToday} value={`KES ${stats.revenuePeriod.toLocaleString()}`} icon={Banknote} tone="success" />
         <StatCard label={t.outstandingBalance} value={`KES ${stats.outstandingBalance.toLocaleString()}`} icon={Wallet} tone={stats.outstandingBalance > 0 ? "warning" : "success"} />
+        <StatCard
+          label="Estimated Revenue (Manual Entry)"
+          value={`KES ${stats.estimatedManualRevenue.amount.toLocaleString()}`}
+          icon={Calculator}
+          tone="info"
+        />
         <StatCard label={t.qcRejections} value={stats.qcRejectedCount} icon={FlaskRound} tone={stats.qcRejectedCount > 0 ? "critical" : "success"} />
       </div>
 
@@ -303,6 +313,64 @@ export default async function DashboardPage({
           tone={stats.equipmentDownCount > 0 ? "critical" : "success"}
         />
       </div>
+
+      {stats.estimatedManualRevenue.byCategory.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Estimated Revenue by Category — Manual Entry</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-0">
+            <p className="px-6 text-sm text-muted-foreground">
+              Quantity deducted via Record Stock Movement × test price, for manually-tracked commodities that map
+              to exactly one test. Estimate only — it never posts to invoices or payments.
+              {stats.estimatedManualRevenue.itemsExcluded > 0 &&
+                ` ${stats.estimatedManualRevenue.itemsExcluded} manually-tracked commodit${
+                  stats.estimatedManualRevenue.itemsExcluded === 1 ? "y isn't" : "ies aren't"
+                } included (no single matching test).`}
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-muted text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">Category / Commodity</th>
+                    <th className="px-4 py-2 font-medium">Test</th>
+                    <th className="px-4 py-2 text-right font-medium">Quantity Used</th>
+                    <th className="px-4 py-2 text-right font-medium">Unit Price</th>
+                    <th className="px-4 py-2 text-right font-medium">Est. Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.estimatedManualRevenue.byCategory.map((bucket) => (
+                    <Fragment key={bucket.category}>
+                      <tr className="border-t border-border bg-surface-muted/50">
+                        <td colSpan={4} className="px-4 py-2 font-semibold capitalize text-foreground">
+                          {bucket.category}
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold tabular-nums text-foreground">
+                          KES {bucket.amount.toLocaleString()}
+                        </td>
+                      </tr>
+                      {bucket.lines.map((line) => (
+                        <tr key={line.itemId} className="border-t border-border">
+                          <td className="px-4 py-2 pl-8 text-foreground">
+                            {line.itemName} <span className="text-muted-foreground">({line.itemCode})</span>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">{line.testName}</td>
+                          <td className="px-4 py-2 text-right tabular-nums">{line.quantityUsed}</td>
+                          <td className="px-4 py-2 text-right tabular-nums">KES {line.unitPrice.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-right font-medium tabular-nums">
+                            KES {line.amount.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

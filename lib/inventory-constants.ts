@@ -5,4 +5,5 @@ export const EDITABLE_STOCK_TRANSACTION_TYPES = [
   "expiry",
   "stock_count_correction",
   "opening_balance",
+  "manual_usage",
 ] as const;

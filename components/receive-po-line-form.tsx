@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { receivePurchaseOrderLine } from "@/lib/actions/procurement";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 
 export function ReceivePoLineForm({
   poId,
@@ -27,7 +27,9 @@ export function ReceivePoLineForm({
       <input type="hidden" name="po_id" value={poId} />
       <input type="hidden" name="line_id" value={lineId} />
       <div>
+        <Label htmlFor={`quantity-${lineId}`}>Quantity received</Label>
         <Input
+          id={`quantity-${lineId}`}
           name="quantity"
           type="number"
           step="0.01"
@@ -39,10 +41,18 @@ export function ReceivePoLineForm({
         />
       </div>
       <div>
-        <Input name="batch_number" placeholder="Batch no. (optional)" className="h-9 w-36" />
+        <Label htmlFor={`batch_number-${lineId}`}>Batch no. (optional)</Label>
+        <Input id={`batch_number-${lineId}`} name="batch_number" className="h-9 w-36" />
       </div>
       <div>
-        <Input name="expiry_date" type="date" className="h-9 w-36" title="Expiry date (optional)" />
+        <Label htmlFor={`expiry_date-${lineId}`}>Expiry date (optional)</Label>
+        <Input
+          id={`expiry_date-${lineId}`}
+          name="expiry_date"
+          type="date"
+          className="h-9 w-36"
+          title="The product's expiry date — leave blank if unknown. Only fill this in if you actually know when it expires; it drives the 'Expiring <6mo' figure on stock reports."
+        />
       </div>
       <Button type="submit" size="sm" variant="secondary" disabled={pending}>
         {pending ? "Receiving..." : "Receive"}

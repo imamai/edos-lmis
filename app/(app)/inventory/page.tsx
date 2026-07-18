@@ -13,7 +13,7 @@ export default async function InventoryPage() {
   const { data: items, error } = await supabase
     .from("edoslmis_inventory_items")
     .select(
-      "id, code, name, category, unit_of_measure, reorder_level, edoslmis_departments(name), edoslmis_inventory_balances(current_balance)"
+      "id, code, name, category, unit_of_measure, reorder_level, tracking_mode, edoslmis_departments(name), edoslmis_inventory_balances(current_balance)"
     )
     .eq("is_active", true)
     .order("name");
@@ -44,6 +44,7 @@ export default async function InventoryPage() {
               <th className="px-4 py-3 font-medium">Item</th>
               <th className="px-4 py-3 font-medium">Department</th>
               <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Tracking</th>
               <th className="px-4 py-3 font-medium">Balance</th>
               <th className="px-4 py-3 font-medium">Reorder Level</th>
               <th className="px-4 py-3" />
@@ -52,12 +53,12 @@ export default async function InventoryPage() {
           <tbody>
             {error && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-critical">{error.message}</td>
+                <td colSpan={7} className="px-4 py-6 text-center text-critical">{error.message}</td>
               </tr>
             )}
             {!error && (items?.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No commodities yet.</td>
+                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No commodities yet.</td>
               </tr>
             )}
             {items?.map((item) => {
@@ -79,6 +80,13 @@ export default async function InventoryPage() {
                   <td className="px-4 py-3 text-muted-foreground">{dept?.name ?? "-"}</td>
                   <td className="px-4 py-3">
                     <Badge tone="neutral">{item.category}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.tracking_mode === "manual_entry" ? (
+                      <Badge tone="info">Manual entry</Badge>
+                    ) : (
+                      <Badge tone="neutral">Order-driven</Badge>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={isLow ? "font-semibold text-critical" : "font-medium text-foreground"}>

@@ -157,10 +157,17 @@ export async function enterResults(orderTestId: string, formData: FormData) {
 
   const { data: reagentUsage } = await supabase
     .from("edoslmis_test_reagent_usage")
-    .select("item_id, quantity_per_test")
+    .select("item_id, quantity_per_test, edoslmis_inventory_items!inner(tracking_mode)")
     .eq("test_id", orderTest.test_id);
 
   for (const usage of reagentUsage ?? []) {
+    const item = usage.edoslmis_inventory_items as unknown as { tracking_mode: string } | null;
+    if (item?.tracking_mode === "manual_entry") {
+      // Tracked via Record Stock Movement (manual usage) instead — an
+      // automatic test_usage deduction here would double-count it, and
+      // edoslmis_record_stock_transaction rejects it anyway.
+      continue;
+    }
     await supabase.rpc("edoslmis_record_stock_transaction", {
       p_item_id: usage.item_id,
       p_transaction_type: "test_usage",

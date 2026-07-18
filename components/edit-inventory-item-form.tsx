@@ -14,6 +14,7 @@ type ItemRecord = {
   unit_of_measure: string;
   reorder_level: number;
   department_id: string | null;
+  tracking_mode: string;
 };
 
 type CategoryOption = { value: string; label: string };
@@ -69,6 +70,17 @@ export function EditInventoryItemForm({
           <div>
             <Label htmlFor="reorder_level">Reorder level</Label>
             <Input id="reorder_level" name="reorder_level" type="number" step="0.01" defaultValue={item.reorder_level} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="tracking_mode">Tracking mode</Label>
+            <Select id="tracking_mode" name="tracking_mode" defaultValue={item.tracking_mode}>
+              <option value="order_driven">Order-driven — deducted automatically from Orders → Results</option>
+              <option value="manual_entry">Manual entry — deducted via Record Stock Movement (Manual usage)</option>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Switching modes only changes how future usage is deducted — it never rewrites past stock movements.
+              A commodity can only be deducted through one path at a time.
+            </p>
           </div>
         </CardContent>
       </Card>

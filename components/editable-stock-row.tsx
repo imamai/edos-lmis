@@ -15,6 +15,7 @@ const typeTone: Record<string, "neutral" | "success" | "critical" | "warning" | 
   wastage: "critical",
   expiry: "critical",
   stock_count_correction: "neutral",
+  manual_usage: "warning",
 };
 
 const typeOptions = [
@@ -24,6 +25,7 @@ const typeOptions = [
   { value: "expiry", label: "Expiry" },
   { value: "stock_count_correction", label: "Stock count correction" },
   { value: "opening_balance", label: "Opening balance" },
+  { value: "manual_usage", label: "Manual usage (tests done)" },
 ];
 
 export function EditableStockRow({

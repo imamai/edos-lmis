@@ -6,6 +6,7 @@ import { StockMovementForm } from "@/components/stock-movement-form";
 import { InventoryItemActiveToggle } from "@/components/inventory-item-active-toggle";
 import { DeleteEntityButton } from "@/components/delete-entity-button";
 import { EditableStockRow } from "@/components/editable-stock-row";
+import { EditableBatchRow } from "@/components/editable-batch-row";
 import { deleteInventoryItem } from "@/lib/actions/inventory";
 import { EDITABLE_STOCK_TRANSACTION_TYPES } from "@/lib/inventory-constants";
 import Link from "next/link";
@@ -16,6 +17,7 @@ const typeTone: Record<string, "neutral" | "success" | "critical" | "warning" | 
   opening_balance: "neutral",
   receipt: "success",
   test_usage: "info",
+  manual_usage: "warning",
   positive_adjustment: "success",
   negative_adjustment: "warning",
   wastage: "critical",
@@ -35,7 +37,7 @@ export default async function InventoryItemPage({
 
   const { data: item, error: itemError } = await supabase
     .from("edoslmis_inventory_items")
-    .select("id, code, name, category, unit_of_measure, reorder_level, is_active, edoslmis_departments(name)")
+    .select("id, code, name, category, unit_of_measure, reorder_level, is_active, tracking_mode, edoslmis_departments(name)")
     .eq("id", id)
     .single();
 
@@ -48,7 +50,7 @@ export default async function InventoryItemPage({
   }
   if (!item) notFound();
 
-  const [{ data: transactions }, { count: poLineCount }] = await Promise.all([
+  const [{ data: transactions }, { count: poLineCount }, { data: batches }] = await Promise.all([
     supabase
       .from("edoslmis_stock_transactions")
       .select("id, transaction_type, quantity_change, balance_after, notes, performed_at")
@@ -60,6 +62,12 @@ export default async function InventoryItemPage({
       .from("edoslmis_purchase_order_lines")
       .select("id", { count: "exact", head: true })
       .eq("item_id", id),
+    supabase
+      .from("edoslmis_stock_batches")
+      .select("id, batch_number, supplier_name, expiry_date, quantity_received, quantity_remaining, unit_cost, is_active, received_at")
+      .eq("item_id", id)
+      .order("expiry_date", { ascending: true, nullsFirst: false })
+      .order("received_at", { ascending: false }),
   ]);
 
   const usageCount = (transactions?.length ?? 0) + (poLineCount ?? 0);
@@ -74,7 +82,12 @@ export default async function InventoryItemPage({
         <div>
           <h1 className="text-xl font-semibold text-foreground">{item.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {item.code} &middot; {dept?.name ?? "Unassigned"} &middot; <Badge tone="neutral">{item.category}</Badge>
+            {item.code} &middot; {dept?.name ?? "Unassigned"} &middot; <Badge tone="neutral">{item.category}</Badge>{" "}
+            {item.tracking_mode === "manual_entry" ? (
+              <Badge tone="info">Manual entry</Badge>
+            ) : (
+              <Badge tone="neutral">Order-driven</Badge>
+            )}
             {!item.is_active && <Badge tone="neutral" className="ml-1">Inactive</Badge>}
           </p>
         </div>
@@ -107,7 +120,7 @@ export default async function InventoryItemPage({
           <CardTitle>Record Stock Movement</CardTitle>
         </CardHeader>
         <CardContent>
-          <StockMovementForm itemId={id} />
+          <StockMovementForm itemId={id} trackingMode={item.tracking_mode} />
         </CardContent>
       </Card>
 
@@ -178,6 +191,55 @@ export default async function InventoryItemPage({
                   <td />
                 </tr>
               )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Batches</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-muted text-left text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 font-medium">Batch No.</th>
+                <th className="px-4 py-2 font-medium">Supplier</th>
+                <th className="px-4 py-2 font-medium">Expiry Date</th>
+                <th className="px-4 py-2 font-medium">Qty Remaining / Received</th>
+                <th className="px-4 py-2 font-medium">Unit Cost</th>
+                <th className="px-4 py-2 font-medium">Status</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {(batches?.length ?? 0) === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                    No batches recorded yet — batches are created when receiving a purchase order line with a
+                    batch number or expiry date.
+                  </td>
+                </tr>
+              )}
+              {batches?.map((batch) => (
+                <EditableBatchRow
+                  key={batch.id}
+                  itemId={id}
+                  unitOfMeasure={item.unit_of_measure}
+                  batch={{
+                    id: batch.id,
+                    batchNumber: batch.batch_number,
+                    supplierName: batch.supplier_name,
+                    expiryDate: batch.expiry_date,
+                    quantityReceived: Number(batch.quantity_received),
+                    quantityRemaining: Number(batch.quantity_remaining),
+                    unitCost: batch.unit_cost === null ? null : Number(batch.unit_cost),
+                    isActive: batch.is_active,
+                    receivedAt: batch.received_at,
+                  }}
+                />
+              ))}
             </tbody>
           </table>
         </CardContent>
