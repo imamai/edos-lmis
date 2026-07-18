@@ -15,6 +15,7 @@ export type StaffMember = {
   staff_category: string | null;
   is_active: boolean;
   roles: StaffRoleAssignment[];
+  custom_permissions: string[];
 };
 
 export async function getStaffWithRoles(): Promise<{ data: StaffMember[]; error: string | null }> {
@@ -22,14 +23,25 @@ export async function getStaffWithRoles(): Promise<{ data: StaffMember[]; error:
   const { data, error } = await supabase.rpc("edoslmis_list_staff_with_roles");
   if (error) return { data: [], error: error.message };
   return {
-    data: (data ?? []).map((row: { user_id: string; first_name: string; last_name: string; staff_category: string | null; is_active: boolean; roles: StaffRoleAssignment[] | null }) => ({
-      user_id: row.user_id,
-      first_name: row.first_name,
-      last_name: row.last_name,
-      staff_category: row.staff_category,
-      is_active: row.is_active,
-      roles: row.roles ?? [],
-    })),
+    data: (data ?? []).map(
+      (row: {
+        user_id: string;
+        first_name: string;
+        last_name: string;
+        staff_category: string | null;
+        is_active: boolean;
+        roles: StaffRoleAssignment[] | null;
+        custom_permissions: string[] | null;
+      }) => ({
+        user_id: row.user_id,
+        first_name: row.first_name,
+        last_name: row.last_name,
+        staff_category: row.staff_category,
+        is_active: row.is_active,
+        roles: row.roles ?? [],
+        custom_permissions: row.custom_permissions ?? [],
+      })
+    ),
     error: null,
   };
 }

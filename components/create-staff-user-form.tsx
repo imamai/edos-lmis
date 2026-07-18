@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { createStaffUser } from "@/lib/actions/staff";
 import { STAFF_CATEGORIES } from "@/lib/staff-categories";
+import { PERMISSION_GROUPS } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,6 +104,32 @@ export function CreateStaffUserForm({ roles }: { roles: RoleRow[] }) {
                   </label>
                 ))}
                 {roles.length === 0 && <p className="text-sm text-muted-foreground">No roles defined for this tenant yet.</p>}
+              </div>
+            </div>
+
+            <div>
+              <Label>Custom permissions (optional)</Label>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Grant specific access beyond the roles above — useful for a narrow exception without creating or
+                widening a role. Checking a service here adds that access; leaving it unchecked simply doesn&apos;t
+                grant it.
+              </p>
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                {PERMISSION_GROUPS.map((group) => (
+                  <div key={group.group}>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {group.group}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {group.permissions.map((p) => (
+                        <label key={p.value} className="flex items-center gap-2 text-sm text-foreground">
+                          <input type="checkbox" name="permission" value={p.value} className="h-4 w-4" />
+                          {p.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

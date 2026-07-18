@@ -19,6 +19,7 @@ export async function createStaffUser(_prevState: { error: string | null } | nul
   const staffCategory = String(formData.get("staff_category") ?? "").trim() || null;
   const grantAdmin = formData.get("is_tenant_admin") === "on" && staff.isTenantAdmin;
   const roleIds = formData.getAll("role_id").map(String).filter(Boolean);
+  const permissions = formData.getAll("permission").map(String).filter(Boolean);
 
   if (!email || !firstName || !lastName) return { error: "First name, last name, and email are required." };
   if (password.length < 8) return { error: "Temporary password must be at least 8 characters." };
@@ -56,6 +57,13 @@ export async function createStaffUser(_prevState: { error: string | null } | nul
       p_user_id: created.user.id,
       p_role_id: roleId,
       p_branch_id: staff.branchId,
+    });
+  }
+
+  if (permissions.length > 0) {
+    await supabase.rpc("edoslmis_set_user_permission_overrides", {
+      p_user_id: created.user.id,
+      p_permissions: permissions,
     });
   }
 
@@ -103,6 +111,27 @@ export async function setStaffRoleActive(userRoleId: string, isActive: boolean) 
   const { error } = await supabase.rpc("edoslmis_set_staff_role_active", {
     p_user_role_id: userRoleId,
     p_is_active: isActive,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/staff");
+  return { error: null };
+}
+
+export async function updateStaffPermissionOverrides(
+  _prevState: { error: string | null } | null,
+  formData: FormData
+) {
+  const userId = String(formData.get("user_id") ?? "");
+  if (!userId) return { error: "Missing staff member." };
+  const permissions = formData.getAll("permission").map(String).filter(Boolean);
+
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("edoslmis_set_user_permission_overrides", {
+    p_user_id: userId,
+    p_permissions: permissions,
   });
   if (error) return { error: error.message };
 

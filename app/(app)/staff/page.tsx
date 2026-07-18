@@ -5,6 +5,7 @@ import { CreateStaffUserForm } from "@/components/create-staff-user-form";
 import { AssignStaffRoleForm } from "@/components/assign-staff-role-form";
 import { StaffRoleToggle } from "@/components/staff-role-toggle";
 import { StaffActiveToggle } from "@/components/staff-active-toggle";
+import { EditStaffPermissionsButton } from "@/components/edit-staff-permissions-button";
 
 export default async function StaffPage() {
   const staff = await getCurrentStaff();
@@ -54,12 +55,13 @@ export default async function StaffPage() {
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 font-medium">Roles</th>
+                <th className="px-4 py-3 font-medium">Custom access</th>
               </tr>
             </thead>
             <tbody>
               {members.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">No staff found.</td>
+                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No staff found.</td>
                 </tr>
               )}
               {members.map((m) => (
@@ -81,6 +83,13 @@ export default async function StaffPage() {
                         />
                       ))}
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <EditStaffPermissionsButton
+                      userId={m.user_id}
+                      staffName={`${m.first_name} ${m.last_name}`}
+                      currentPermissions={m.custom_permissions}
+                    />
                   </td>
                 </tr>
               ))}
