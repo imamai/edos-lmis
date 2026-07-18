@@ -51,3 +51,16 @@ export async function deleteListItem(id: string) {
   revalidatePath("/equipment/new");
   return { error: null };
 }
+
+export async function setListItemActive(id: string, isActive: boolean) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("edoslmis_settings_lists").update({ is_active: isActive }).eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  revalidatePath("/inventory/new");
+  revalidatePath("/equipment/new");
+  return { error: null };
+}

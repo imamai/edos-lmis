@@ -1,6 +1,6 @@
 import { getCurrentStaff } from "@/lib/auth";
 import { getTenantSettings } from "@/lib/data/settings";
-import { getSettingsList } from "@/lib/data/settings-lists";
+import { getSettingsListWithStatus } from "@/lib/data/settings-lists";
 import { getOrganisms, getAntibiotics } from "@/lib/data/microbiology-catalog";
 import { TenantSettingsForm } from "@/components/tenant-settings-form";
 import { BrandingUploadForm } from "@/components/branding-upload-form";
@@ -25,10 +25,10 @@ export default async function SettingsPage() {
   const [settings, categories, equipmentTypes, paymentMethods, histopathologyStains, organisms, antibiotics] =
     await Promise.all([
       getTenantSettings(staff.tenantId),
-      getSettingsList("inventory_category"),
-      getSettingsList("equipment_type"),
-      getSettingsList("payment_method"),
-      getSettingsList("histopathology_stain"),
+      getSettingsListWithStatus("inventory_category"),
+      getSettingsListWithStatus("equipment_type"),
+      getSettingsListWithStatus("payment_method"),
+      getSettingsListWithStatus("histopathology_stain"),
       getOrganisms(),
       getAntibiotics(),
     ]);
