@@ -58,6 +58,7 @@ export type SupplierBillDetail = {
   balance_due: number;
   status: string;
   bill_date: string;
+  due_date: string | null;
   notes: string | null;
   cancellation_reason: string | null;
   supplier_invoice_number: string | null;
@@ -71,7 +72,7 @@ export async function getSupplierBill(id: string): Promise<{ data: SupplierBillD
   const { data: bill, error } = await supabase
     .from("edoslmis_supplier_bills")
     .select(
-      "id, bill_number, po_id, subtotal, total_amount, amount_paid, balance_due, status, bill_date, notes, cancellation_reason, supplier_invoice_number, edoslmis_suppliers(id, name, email, phone)"
+      "id, bill_number, po_id, subtotal, total_amount, amount_paid, balance_due, status, bill_date, due_date, notes, cancellation_reason, supplier_invoice_number, edoslmis_suppliers(id, name, email, phone)"
     )
     .eq("id", id)
     .single();
@@ -101,6 +102,7 @@ export async function getSupplierBill(id: string): Promise<{ data: SupplierBillD
       balance_due: Number(bill.balance_due),
       status: bill.status,
       bill_date: bill.bill_date,
+      due_date: bill.due_date,
       notes: bill.notes,
       cancellation_reason: bill.cancellation_reason,
       supplier_invoice_number: bill.supplier_invoice_number,

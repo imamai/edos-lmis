@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { SupplierPaymentForm } from "@/components/supplier-payment-form";
 import { CancelSupplierBillButton } from "@/components/cancel-supplier-bill-button";
 import { SupplierInvoiceNumberForm } from "@/components/supplier-invoice-number-form";
-import { updateSupplierBillSupplierInvoiceNumber } from "@/lib/actions/supplier-bills";
+import { EditSupplierBillForm } from "@/components/edit-supplier-bill-form";
+import { DeleteEntityButton } from "@/components/delete-entity-button";
+import { updateSupplierBillSupplierInvoiceNumber, deleteSupplierBill } from "@/lib/actions/supplier-bills";
 import { PdfPreview } from "@/components/pdf-preview";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -74,9 +76,31 @@ export default async function SupplierBillDetailPage({
         </p>
       )}
 
+      {bill.status !== "cancelled" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Bill Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EditSupplierBillForm
+              billId={bill.id}
+              billDate={bill.bill_date}
+              dueDate={bill.due_date}
+              notes={bill.notes}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {bill.status !== "cancelled" && Number(bill.amount_paid) === 0 && (
         <div>
           <CancelSupplierBillButton billId={id} />
+        </div>
+      )}
+
+      {bill.status === "cancelled" && (
+        <div>
+          <DeleteEntityButton id={bill.id} action={deleteSupplierBill} canDelete entityLabel="supplier bill" />
         </div>
       )}
 

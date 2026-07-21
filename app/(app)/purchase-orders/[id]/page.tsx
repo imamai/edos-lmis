@@ -7,10 +7,12 @@ import { SendPoButton } from "@/components/send-po-button";
 import { ConfirmPoButton } from "@/components/confirm-po-button";
 import { CancelPoButton } from "@/components/cancel-po-button";
 import { ReceivePoLineForm } from "@/components/receive-po-line-form";
+import { CorrectPoLineReceiptForm } from "@/components/correct-po-line-receipt-form";
 import { GenerateSupplierBillButton } from "@/components/generate-supplier-bill-button";
 import { ResendPoButton } from "@/components/resend-po-button";
 import { SupplierInvoiceNumberForm } from "@/components/supplier-invoice-number-form";
-import { updatePurchaseOrderSupplierInvoiceNumber } from "@/lib/actions/procurement";
+import { DeleteEntityButton } from "@/components/delete-entity-button";
+import { updatePurchaseOrderSupplierInvoiceNumber, deletePurchaseOrder } from "@/lib/actions/procurement";
 import { PdfPreview } from "@/components/pdf-preview";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -46,6 +48,10 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
   const canEdit = ["draft", "sent", "confirmed"].includes(po.status);
   const canResend = po.revision > 0 && po.status !== "cancelled";
   const existingBill = canGenerateBill ? await getSupplierBillByPoId(po.id) : null;
+  // Corrections rewrite quantity_received directly, so they're locked out once
+  // a bill has been raised off those totals — bill amounts are never manually
+  // editable, so a correction afterward would silently desync the two.
+  const canCorrectReceipt = ["partially_received", "received"].includes(po.status) && !existingBill;
 
   return (
     <div className="space-y-6">
@@ -109,6 +115,9 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
         {canConfirm && <ConfirmPoButton poId={po.id} />}
         {canResend && <ResendPoButton poId={po.id} />}
         {canCancel && <CancelPoButton poId={po.id} />}
+        {po.status === "draft" && (
+          <DeleteEntityButton id={po.id} action={deletePurchaseOrder} canDelete entityLabel="purchase order" />
+        )}
         {canDownloadGrn && (
           <Link href={`/purchase-orders/${po.id}/grn`}>
             <Button variant="outline">
@@ -140,6 +149,7 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
                 <th className="px-4 py-2 font-medium">Received</th>
                 <th className="px-4 py-2 font-medium">Unit cost</th>
                 {canReceive && <th className="px-4 py-2 font-medium">Receive</th>}
+                {canCorrectReceipt && <th className="px-4 py-2 font-medium">Correct</th>}
               </tr>
             </thead>
             <tbody>
@@ -170,6 +180,21 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
                         />
                       </td>
                     )}
+                    {canCorrectReceipt && (
+                      <td className="px-4 py-2">
+                        {line.quantity_received > 0 ? (
+                          <CorrectPoLineReceiptForm
+                            poId={po.id}
+                            lineId={line.id}
+                            unitOfMeasure={line.item?.unit_of_measure ?? "unit"}
+                            quantityReceived={line.quantity_received}
+                            unitCost={line.unit_cost}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -177,6 +202,13 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
           </table>
         </CardContent>
       </Card>
+
+      {["partially_received", "received"].includes(po.status) && existingBill && (
+        <p className="text-xs text-muted-foreground">
+          Received quantities are locked while a supplier bill exists for this PO — cancel the bill first to correct
+          them.
+        </p>
+      )}
     </div>
   );
 }

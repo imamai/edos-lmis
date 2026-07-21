@@ -306,8 +306,49 @@ export async function updatePurchaseOrderSupplierInvoiceNumber(
     .eq("id", poId);
   if (error) return { error: error.message };
 
+  // Carry the number over to the bill already generated for this PO (if
+  // any) — the invoice usually arrives after the bill's been raised off the
+  // GRN, so this is the only point where the two rows can be kept in sync.
+  const { data: bill } = await supabase
+    .from("edoslmis_supplier_bills")
+    .select("id")
+    .eq("po_id", poId)
+    .neq("status", "cancelled")
+    .maybeSingle();
+  if (bill) {
+    await supabase
+      .from("edoslmis_supplier_bills")
+      .update({ supplier_invoice_number: supplierInvoiceNumber })
+      .eq("id", bill.id);
+    revalidatePath(`/supplier-bills/${bill.id}`);
+  }
+
   revalidatePath(`/purchase-orders/${poId}`);
   return { error: null };
+}
+
+export async function deletePurchaseOrder(poId: string) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("edoslmis_purchase_orders")
+    .delete()
+    .eq("id", poId)
+    .eq("status", "draft")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23503") {
+      return { error: "This purchase order has related records and can't be deleted." };
+    }
+    return { error: error.message };
+  }
+  if (!data) return { error: "Only draft purchase orders can be deleted." };
+
+  revalidatePath("/purchase-orders");
+  redirect("/purchase-orders");
 }
 
 export async function sendPurchaseOrder(poId: string) {
@@ -443,6 +484,44 @@ export async function receivePurchaseOrderLine(
     p_batch_number: batchNumber,
     p_expiry_date: expiryDate,
     p_notes: notes,
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
+  revalidatePath("/inventory");
+  return { error: null };
+}
+
+export async function correctPurchaseOrderLineReceipt(
+  _prevState: { error: string | null } | null,
+  formData: FormData
+) {
+  const lineId = String(formData.get("line_id") ?? "");
+  const poId = String(formData.get("po_id") ?? "");
+  const quantityRaw = String(formData.get("quantity_received") ?? "").trim();
+  const unitCostRaw = String(formData.get("unit_cost") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  const quantity = Number(quantityRaw);
+  if (!lineId || quantityRaw === "" || Number.isNaN(quantity) || quantity < 0) {
+    return { error: "Enter a corrected quantity of zero or more." };
+  }
+  const unitCost = unitCostRaw === "" ? null : Number(unitCostRaw);
+  if (unitCost !== null && (Number.isNaN(unitCost) || unitCost < 0)) {
+    return { error: "Enter a corrected unit cost of zero or more." };
+  }
+  if (!reason) return { error: "Enter a reason for this correction." };
+
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("edoslmis_correct_purchase_order_line_receipt", {
+    p_line_id: lineId,
+    p_new_quantity_received: quantity,
+    p_new_unit_cost: unitCost,
+    p_reason: reason,
   });
 
   if (error) return { error: error.message };

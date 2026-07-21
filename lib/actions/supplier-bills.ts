@@ -117,6 +117,55 @@ export async function updateSupplierBillSupplierInvoiceNumber(
   return { error: null };
 }
 
+export async function updateSupplierBill(_prevState: { error: string | null } | null, formData: FormData) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const billId = String(formData.get("bill_id") ?? "");
+  if (!billId) return { error: "Missing supplier bill." };
+  const billDate = String(formData.get("bill_date") ?? "").trim();
+  if (!billDate) return { error: "Enter a bill date." };
+  const dueDate = String(formData.get("due_date") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  const { error: currentError } = await supabase
+    .from("edoslmis_supplier_bills")
+    .select("id")
+    .eq("id", billId)
+    .neq("status", "cancelled")
+    .single();
+  if (currentError) return { error: "This supplier bill is cancelled and can no longer be edited." };
+
+  const { error } = await supabase
+    .from("edoslmis_supplier_bills")
+    .update({ bill_date: billDate, due_date: dueDate, notes })
+    .eq("id", billId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/supplier-bills/${billId}`);
+  return { error: null };
+}
+
+export async function deleteSupplierBill(billId: string) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const { data: bill, error: fetchError } = await supabase
+    .from("edoslmis_supplier_bills")
+    .select("po_id, status")
+    .eq("id", billId)
+    .single();
+  if (fetchError) return { error: fetchError.message };
+  if (bill.status !== "cancelled") return { error: "Only cancelled bills can be deleted." };
+
+  const { error } = await supabase.from("edoslmis_supplier_bills").delete().eq("id", billId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/supplier-bills");
+  revalidatePath(`/purchase-orders/${bill.po_id}`);
+  redirect("/supplier-bills");
+}
+
 export async function cancelSupplierBill(_prevState: { error: string | null } | null, formData: FormData) {
   const billId = String(formData.get("bill_id") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
