@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pencil } from "lucide-react";
@@ -25,11 +25,16 @@ export function SupplierInvoiceNumberForm({
   // Locked read-only once a number is on file — it's what ties this record
   // back to the supplier's paperwork for search/tracking, so it shouldn't
   // be nudged by accident. Still reachable via the Correct toggle below.
+  //
+  // Re-locking after a save is NOT done optimistically here (no effect that
+  // flips this on action success) — that raced against the server refresh
+  // that actually carries the new value down as `initialValue`, so it could
+  // flip back to "locked" a moment before the fresh value arrived and
+  // render the *old* value, making a successful save look like it silently
+  // reverted. Callers instead pass `key={initialValue}` on this component,
+  // so a confirmed value change remounts it and this state is freshly
+  // derived from the real value — never a guess.
   const [editing, setEditing] = useState(!initialValue);
-
-  useEffect(() => {
-    if (state && !state.error) setEditing(false);
-  }, [state]);
 
   if (!editing) {
     return (

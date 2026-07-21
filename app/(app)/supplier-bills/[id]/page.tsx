@@ -61,6 +61,7 @@ export default async function SupplierBillDetailPage({
 
       {bill.status !== "cancelled" && (
         <SupplierInvoiceNumberForm
+          key={bill.supplier_invoice_number ?? ""}
           action={updateSupplierBillSupplierInvoiceNumber}
           idField="bill_id"
           idValue={bill.id}

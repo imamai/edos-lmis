@@ -11,6 +11,7 @@ import { CorrectPoLineReceiptForm } from "@/components/correct-po-line-receipt-f
 import { GenerateSupplierBillButton } from "@/components/generate-supplier-bill-button";
 import { ResendPoButton } from "@/components/resend-po-button";
 import { SupplierInvoiceNumberForm } from "@/components/supplier-invoice-number-form";
+import { CorrectPoOrderDateForm } from "@/components/correct-po-order-date-form";
 import { DeleteEntityButton } from "@/components/delete-entity-button";
 import { updatePurchaseOrderSupplierInvoiceNumber, deletePurchaseOrder } from "@/lib/actions/procurement";
 import { PdfPreview } from "@/components/pdf-preview";
@@ -78,12 +79,16 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
       </div>
 
       {po.status !== "cancelled" && (
-        <SupplierInvoiceNumberForm
-          action={updatePurchaseOrderSupplierInvoiceNumber}
-          idField="po_id"
-          idValue={po.id}
-          initialValue={po.supplier_invoice_number}
-        />
+        <div className="flex flex-wrap items-center gap-4">
+          <CorrectPoOrderDateForm key={po.order_date} poId={po.id} orderDate={po.order_date} />
+          <SupplierInvoiceNumberForm
+            key={po.supplier_invoice_number ?? ""}
+            action={updatePurchaseOrderSupplierInvoiceNumber}
+            idField="po_id"
+            idValue={po.id}
+            initialValue={po.supplier_invoice_number}
+          />
+        </div>
       )}
 
       <PdfPreview src={`/api/purchase-orders/${po.id}/pdf`} title={`${po.po_number}.pdf`} />

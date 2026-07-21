@@ -327,6 +327,29 @@ export async function updatePurchaseOrderSupplierInvoiceNumber(
   return { error: null };
 }
 
+export async function correctPurchaseOrderDate(
+  _prevState: { error: string | null } | null,
+  formData: FormData
+) {
+  await getCurrentStaff();
+  const supabase = await createClient();
+
+  const poId = String(formData.get("po_id") ?? "");
+  const orderDate = String(formData.get("order_date") ?? "").trim();
+  if (!poId || !orderDate) return { error: "Enter a corrected order date." };
+
+  const { error } = await supabase
+    .from("edoslmis_purchase_orders")
+    .update({ order_date: orderDate })
+    .eq("id", poId)
+    .neq("status", "cancelled");
+  if (error) return { error: error.message };
+
+  revalidatePath(`/purchase-orders/${poId}`);
+  revalidatePath("/purchase-orders");
+  return { error: null };
+}
+
 export async function deletePurchaseOrder(poId: string) {
   await getCurrentStaff();
   const supabase = await createClient();
