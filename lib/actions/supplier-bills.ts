@@ -99,9 +99,9 @@ export async function updateSupplierBillSupplierInvoiceNumber(
   if (!billId) return { error: "Missing supplier bill." };
   const supplierInvoiceNumber = String(formData.get("supplier_invoice_number") ?? "").trim() || null;
 
-  const { error: currentError } = await supabase
+  const { data: current, error: currentError } = await supabase
     .from("edoslmis_supplier_bills")
-    .select("id")
+    .select("id, po_id")
     .eq("id", billId)
     .neq("status", "cancelled")
     .single();
@@ -113,7 +113,18 @@ export async function updateSupplierBillSupplierInvoiceNumber(
     .eq("id", billId);
   if (error) return { error: error.message };
 
+  // Keep the PO's own copy in sync too — same mirrored sync
+  // updatePurchaseOrderSupplierInvoiceNumber does in the other direction, so
+  // the number matches everywhere it's tracked regardless of which side it
+  // was corrected from.
+  await supabase
+    .from("edoslmis_purchase_orders")
+    .update({ supplier_invoice_number: supplierInvoiceNumber })
+    .eq("id", current.po_id)
+    .neq("status", "cancelled");
+
   revalidatePath(`/supplier-bills/${billId}`);
+  revalidatePath(`/purchase-orders/${current.po_id}`);
   return { error: null };
 }
 
