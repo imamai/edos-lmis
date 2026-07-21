@@ -7,13 +7,11 @@ import { SendPoButton } from "@/components/send-po-button";
 import { ConfirmPoButton } from "@/components/confirm-po-button";
 import { CancelPoButton } from "@/components/cancel-po-button";
 import { ReceivePoLineForm } from "@/components/receive-po-line-form";
-import { CorrectPoLineReceiptForm } from "@/components/correct-po-line-receipt-form";
+import { CorrectPurchaseOrderModal } from "@/components/correct-purchase-order-modal";
 import { GenerateSupplierBillButton } from "@/components/generate-supplier-bill-button";
 import { ResendPoButton } from "@/components/resend-po-button";
-import { SupplierInvoiceNumberForm } from "@/components/supplier-invoice-number-form";
-import { CorrectPoOrderDateForm } from "@/components/correct-po-order-date-form";
 import { DeleteEntityButton } from "@/components/delete-entity-button";
-import { updatePurchaseOrderSupplierInvoiceNumber, deletePurchaseOrder } from "@/lib/actions/procurement";
+import { deletePurchaseOrder } from "@/lib/actions/procurement";
 import { PdfPreview } from "@/components/pdf-preview";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,7 +47,15 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
   const canEdit = ["draft", "sent", "confirmed"].includes(po.status);
   const canResend = po.revision > 0 && po.status !== "cancelled";
   const existingBill = canGenerateBill ? await getSupplierBillByPoId(po.id) : null;
-  const canCorrectReceipt = ["partially_received", "received"].includes(po.status);
+  const correctableLines = po.lines
+    .filter((line) => line.quantity_received > 0)
+    .map((line) => ({
+      id: line.id,
+      quantityReceived: line.quantity_received,
+      unitCost: line.unit_cost,
+      itemName: `${line.item?.name ?? "Unknown item"} (${line.item?.code ?? "-"})`,
+      unitOfMeasure: line.item?.unit_of_measure ?? "unit",
+    }));
 
   return (
     <div className="space-y-6">
@@ -66,6 +72,7 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
             )}
             {" · "}Ordered {po.order_date}
             {po.expected_date && <> · Expected {po.expected_date}</>}
+            {po.supplier_invoice_number && <> · Invoice # {po.supplier_invoice_number}</>}
           </p>
         </div>
         <div className="text-right">
@@ -77,19 +84,6 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
           )}
         </div>
       </div>
-
-      {po.status !== "cancelled" && (
-        <div className="flex flex-wrap items-center gap-4">
-          <CorrectPoOrderDateForm key={po.order_date} poId={po.id} orderDate={po.order_date} />
-          <SupplierInvoiceNumberForm
-            key={po.supplier_invoice_number ?? ""}
-            action={updatePurchaseOrderSupplierInvoiceNumber}
-            idField="po_id"
-            idValue={po.id}
-            initialValue={po.supplier_invoice_number}
-          />
-        </div>
-      )}
 
       <PdfPreview src={`/api/purchase-orders/${po.id}/pdf`} title={`${po.po_number}.pdf`} />
 
@@ -117,6 +111,15 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
         {canConfirm && <ConfirmPoButton poId={po.id} />}
         {canResend && <ResendPoButton poId={po.id} />}
         {canCancel && <CancelPoButton poId={po.id} />}
+        {po.status !== "cancelled" && (
+          <CorrectPurchaseOrderModal
+            poId={po.id}
+            orderDate={po.order_date}
+            supplierInvoiceNumber={po.supplier_invoice_number}
+            lines={correctableLines}
+            billLinked={!!existingBill}
+          />
+        )}
         {po.status === "draft" && (
           <DeleteEntityButton id={po.id} action={deletePurchaseOrder} canDelete entityLabel="purchase order" />
         )}
@@ -151,7 +154,6 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
                 <th className="px-4 py-2 font-medium">Received</th>
                 <th className="px-4 py-2 font-medium">Unit cost</th>
                 {canReceive && <th className="px-4 py-2 font-medium">Receive</th>}
-                {canCorrectReceipt && <th className="px-4 py-2 font-medium">Correct</th>}
               </tr>
             </thead>
             <tbody>
@@ -182,21 +184,6 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
                         />
                       </td>
                     )}
-                    {canCorrectReceipt && (
-                      <td className="px-4 py-2">
-                        {line.quantity_received > 0 ? (
-                          <CorrectPoLineReceiptForm
-                            poId={po.id}
-                            lineId={line.id}
-                            unitOfMeasure={line.item?.unit_of_measure ?? "unit"}
-                            quantityReceived={line.quantity_received}
-                            unitCost={line.unit_cost}
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </td>
-                    )}
                   </tr>
                 );
               })}
@@ -204,16 +191,6 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
           </table>
         </CardContent>
       </Card>
-
-      {canCorrectReceipt && existingBill && (
-        <p className="text-xs text-muted-foreground">
-          Correcting a received quantity or unit cost here will also update the totals on{" "}
-          <Link href={`/supplier-bills/${existingBill.id}`} className="text-primary hover:underline">
-            this PO&apos;s supplier bill
-          </Link>
-          .
-        </p>
-      )}
     </div>
   );
 }

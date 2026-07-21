@@ -114,9 +114,8 @@ export async function updateSupplierBillSupplierInvoiceNumber(
   if (error) return { error: error.message };
 
   // Keep the PO's own copy in sync too — same mirrored sync
-  // updatePurchaseOrderSupplierInvoiceNumber does in the other direction, so
-  // the number matches everywhere it's tracked regardless of which side it
-  // was corrected from.
+  // correctPurchaseOrder does in the other direction, so the number matches
+  // everywhere it's tracked regardless of which side it was corrected from.
   await supabase
     .from("edoslmis_purchase_orders")
     .update({ supplier_invoice_number: supplierInvoiceNumber })

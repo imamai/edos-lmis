@@ -281,16 +281,39 @@ export async function updatePurchaseOrder(_prevState: { error: string } | null, 
   redirect(`/purchase-orders/${poId}`);
 }
 
-export async function updatePurchaseOrderSupplierInvoiceNumber(
+// Consolidates what used to be three separate inline "Correct" controls
+// (order date, supplier invoice number, and one per received line) into a
+// single popup covering everything that might need fixing on a PO after
+// the fact, submitted together in one go.
+export async function correctPurchaseOrder(
   _prevState: { error: string | null } | null,
   formData: FormData
 ) {
-  await getCurrentStaff();
-  const supabase = await createClient();
-
   const poId = String(formData.get("po_id") ?? "");
   if (!poId) return { error: "Missing purchase order." };
+
+  const orderDate = String(formData.get("order_date") ?? "").trim();
+  if (!orderDate) return { error: "Enter an order date." };
   const supplierInvoiceNumber = String(formData.get("supplier_invoice_number") ?? "").trim() || null;
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  const lineIds = formData.getAll("line_id").map(String);
+  const submittedLines: { lineId: string; quantity: number; unitCost: number | null }[] = [];
+  for (const lineId of lineIds) {
+    const qtyRaw = String(formData.get(`quantity__${lineId}`) ?? "").trim();
+    if (qtyRaw === "") continue;
+    const qty = Number(qtyRaw);
+    if (Number.isNaN(qty) || qty < 0) return { error: "Enter a valid received quantity for every line." };
+    const costRaw = String(formData.get(`unit_cost__${lineId}`) ?? "").trim();
+    const unitCost = costRaw === "" ? null : Number(costRaw);
+    if (unitCost !== null && (Number.isNaN(unitCost) || unitCost < 0)) {
+      return { error: "Enter a valid unit cost for every line." };
+    }
+    submittedLines.push({ lineId, quantity: qty, unitCost });
+  }
+
+  await getCurrentStaff();
+  const supabase = await createClient();
 
   const { error: currentError } = await supabase
     .from("edoslmis_purchase_orders")
@@ -300,11 +323,17 @@ export async function updatePurchaseOrderSupplierInvoiceNumber(
     .single();
   if (currentError) return { error: "This purchase order is cancelled and can no longer be edited." };
 
-  const { error } = await supabase
+  const { error: dateError } = await supabase
+    .from("edoslmis_purchase_orders")
+    .update({ order_date: orderDate })
+    .eq("id", poId);
+  if (dateError) return { error: dateError.message };
+
+  const { error: invoiceError } = await supabase
     .from("edoslmis_purchase_orders")
     .update({ supplier_invoice_number: supplierInvoiceNumber })
     .eq("id", poId);
-  if (error) return { error: error.message };
+  if (invoiceError) return { error: invoiceError.message };
 
   // Carry the number over to the bill already generated for this PO (if
   // any) — the invoice usually arrives after the bill's been raised off the
@@ -323,27 +352,41 @@ export async function updatePurchaseOrderSupplierInvoiceNumber(
     revalidatePath(`/supplier-bills/${bill.id}`);
   }
 
-  revalidatePath(`/purchase-orders/${poId}`);
-  return { error: null };
-}
+  if (submittedLines.length > 0) {
+    // Re-derive what actually changed from the DB rather than trusting
+    // client-submitted "current" values, same defensiveness
+    // postStockCountCorrection uses for its discrepancy amount — the RPC
+    // itself also rejects a no-op call, so anything unchanged must be
+    // filtered out before looping rather than left for it to reject.
+    const { data: currentLines } = await supabase
+      .from("edoslmis_purchase_order_lines")
+      .select("id, quantity_received, unit_cost")
+      .in("id", submittedLines.map((l) => l.lineId));
+    const currentByLine = new Map((currentLines ?? []).map((l) => [l.id, l]));
 
-export async function correctPurchaseOrderDate(
-  _prevState: { error: string | null } | null,
-  formData: FormData
-) {
-  await getCurrentStaff();
-  const supabase = await createClient();
+    const changedLines = submittedLines.filter((l) => {
+      const current = currentByLine.get(l.lineId);
+      if (!current) return false;
+      const currentCost = current.unit_cost === null ? null : Number(current.unit_cost);
+      return Number(current.quantity_received) !== l.quantity || currentCost !== l.unitCost;
+    });
 
-  const poId = String(formData.get("po_id") ?? "");
-  const orderDate = String(formData.get("order_date") ?? "").trim();
-  if (!poId || !orderDate) return { error: "Enter a corrected order date." };
+    if (changedLines.length > 0 && !reason) {
+      return { error: "Enter a reason for the quantity/cost corrections." };
+    }
 
-  const { error } = await supabase
-    .from("edoslmis_purchase_orders")
-    .update({ order_date: orderDate })
-    .eq("id", poId)
-    .neq("status", "cancelled");
-  if (error) return { error: error.message };
+    for (const line of changedLines) {
+      const { error } = await supabase.rpc("edoslmis_correct_purchase_order_line_receipt", {
+        p_line_id: line.lineId,
+        p_new_quantity_received: line.quantity,
+        p_new_unit_cost: line.unitCost,
+        p_reason: reason,
+      });
+      if (error) return { error: error.message };
+    }
+
+    revalidatePath("/inventory");
+  }
 
   revalidatePath(`/purchase-orders/${poId}`);
   revalidatePath("/purchase-orders");
@@ -507,44 +550,6 @@ export async function receivePurchaseOrderLine(
     p_batch_number: batchNumber,
     p_expiry_date: expiryDate,
     p_notes: notes,
-  });
-
-  if (error) return { error: error.message };
-
-  revalidatePath(`/purchase-orders/${poId}`);
-  revalidatePath("/purchase-orders");
-  revalidatePath("/inventory");
-  return { error: null };
-}
-
-export async function correctPurchaseOrderLineReceipt(
-  _prevState: { error: string | null } | null,
-  formData: FormData
-) {
-  const lineId = String(formData.get("line_id") ?? "");
-  const poId = String(formData.get("po_id") ?? "");
-  const quantityRaw = String(formData.get("quantity_received") ?? "").trim();
-  const unitCostRaw = String(formData.get("unit_cost") ?? "").trim();
-  const reason = String(formData.get("reason") ?? "").trim();
-
-  const quantity = Number(quantityRaw);
-  if (!lineId || quantityRaw === "" || Number.isNaN(quantity) || quantity < 0) {
-    return { error: "Enter a corrected quantity of zero or more." };
-  }
-  const unitCost = unitCostRaw === "" ? null : Number(unitCostRaw);
-  if (unitCost !== null && (Number.isNaN(unitCost) || unitCost < 0)) {
-    return { error: "Enter a corrected unit cost of zero or more." };
-  }
-  if (!reason) return { error: "Enter a reason for this correction." };
-
-  await getCurrentStaff();
-  const supabase = await createClient();
-
-  const { error } = await supabase.rpc("edoslmis_correct_purchase_order_line_receipt", {
-    p_line_id: lineId,
-    p_new_quantity_received: quantity,
-    p_new_unit_cost: unitCost,
-    p_reason: reason,
   });
 
   if (error) return { error: error.message };
