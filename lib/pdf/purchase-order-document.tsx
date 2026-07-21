@@ -35,6 +35,9 @@ export function PurchaseOrderDocument({ po, settings }: { po: PurchaseOrderDetai
             Status: {po.status.replace(/_/g, " ")}
             {po.expected_date ? `  ·  Expected: ${new Date(po.expected_date).toLocaleDateString()}` : ""}
           </Text>
+          {po.supplier_invoice_number && (
+            <Text style={styles.muted}>Supplier Invoice #: {po.supplier_invoice_number}</Text>
+          )}
           {po.notes && <Text style={styles.muted}>Notes: {po.notes}</Text>}
         </View>
 
