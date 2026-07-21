@@ -2,7 +2,10 @@ import { getSupplierBills } from "@/lib/data/supplier-bills";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ClearFiltersButton } from "@/components/clear-filters-button";
 import Link from "next/link";
+import { Search } from "lucide-react";
 
 const statusTone: Record<string, "neutral" | "warning" | "info" | "success" | "critical"> = {
   issued: "warning",
@@ -11,8 +14,13 @@ const statusTone: Record<string, "neutral" | "warning" | "info" | "success" | "c
   cancelled: "critical",
 };
 
-export default async function SupplierBillsPage() {
-  const { data: bills, error } = await getSupplierBills();
+export default async function SupplierBillsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const { data: bills, error } = await getSupplierBills(q);
 
   return (
     <div className="space-y-6">
@@ -26,11 +34,21 @@ export default async function SupplierBillsPage() {
         </Link>
       </div>
 
+      <form className="flex max-w-md gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input name="q" defaultValue={q} placeholder="Search by bill # or supplier invoice #" className="pl-9" />
+        </div>
+        <Button type="submit" variant="secondary">Search</Button>
+        {q && <ClearFiltersButton href="/supplier-bills" />}
+      </form>
+
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-surface-muted text-left text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Bill</th>
+              <th className="px-4 py-3 font-medium">Supplier Invoice #</th>
               <th className="px-4 py-3 font-medium">Supplier</th>
               <th className="px-4 py-3 font-medium">Total</th>
               <th className="px-4 py-3 font-medium">Balance Due</th>
@@ -40,12 +58,14 @@ export default async function SupplierBillsPage() {
           <tbody>
             {error && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-critical">{error}</td>
+                <td colSpan={6} className="px-4 py-6 text-center text-critical">{error}</td>
               </tr>
             )}
             {!error && bills.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No supplier bills yet.</td>
+                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                  {q ? "No supplier bills match your search." : "No supplier bills yet."}
+                </td>
               </tr>
             )}
             {bills.map((bill) => (
@@ -55,6 +75,7 @@ export default async function SupplierBillsPage() {
                     {bill.bill_number}
                   </Link>
                 </td>
+                <td className="px-4 py-3 text-muted-foreground">{bill.supplier_invoice_number ?? "-"}</td>
                 <td className="px-4 py-3 text-muted-foreground">{bill.supplier?.name ?? "-"}</td>
                 <td className="px-4 py-3 text-foreground">KES {bill.total_amount}</td>
                 <td className="px-4 py-3">

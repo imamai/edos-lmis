@@ -48,10 +48,7 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
   const canEdit = ["draft", "sent", "confirmed"].includes(po.status);
   const canResend = po.revision > 0 && po.status !== "cancelled";
   const existingBill = canGenerateBill ? await getSupplierBillByPoId(po.id) : null;
-  // Corrections rewrite quantity_received directly, so they're locked out once
-  // a bill has been raised off those totals — bill amounts are never manually
-  // editable, so a correction afterward would silently desync the two.
-  const canCorrectReceipt = ["partially_received", "received"].includes(po.status) && !existingBill;
+  const canCorrectReceipt = ["partially_received", "received"].includes(po.status);
 
   return (
     <div className="space-y-6">
@@ -203,10 +200,13 @@ export default async function PurchaseOrderDetailPage({ params }: { params: Prom
         </CardContent>
       </Card>
 
-      {["partially_received", "received"].includes(po.status) && existingBill && (
+      {canCorrectReceipt && existingBill && (
         <p className="text-xs text-muted-foreground">
-          Received quantities are locked while a supplier bill exists for this PO — cancel the bill first to correct
-          them.
+          Correcting a received quantity or unit cost here will also update the totals on{" "}
+          <Link href={`/supplier-bills/${existingBill.id}`} className="text-primary hover:underline">
+            this PO&apos;s supplier bill
+          </Link>
+          .
         </p>
       )}
     </div>

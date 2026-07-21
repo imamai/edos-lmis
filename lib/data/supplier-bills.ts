@@ -8,15 +8,24 @@ export type SupplierBillListRow = {
   balance_due: number;
   status: string;
   bill_date: string;
+  supplier_invoice_number: string | null;
   supplier: { id: string; name: string } | null;
 };
 
-export async function getSupplierBills(): Promise<{ data: SupplierBillListRow[]; error: string | null }> {
+export async function getSupplierBills(q?: string): Promise<{ data: SupplierBillListRow[]; error: string | null }> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("edoslmis_supplier_bills")
-    .select("id, bill_number, total_amount, amount_paid, balance_due, status, bill_date, edoslmis_suppliers(id, name)")
+    .select(
+      "id, bill_number, total_amount, amount_paid, balance_due, status, bill_date, supplier_invoice_number, edoslmis_suppliers(id, name)"
+    )
     .order("created_at", { ascending: false });
+
+  if (q) {
+    query = query.or(`bill_number.ilike.%${q}%,supplier_invoice_number.ilike.%${q}%`);
+  }
+
+  const { data, error } = await query;
   if (error) return { data: [], error: error.message };
 
   const rows = (data ?? []).map((b) => ({
@@ -27,6 +36,7 @@ export async function getSupplierBills(): Promise<{ data: SupplierBillListRow[];
     balance_due: Number(b.balance_due),
     status: b.status,
     bill_date: b.bill_date,
+    supplier_invoice_number: b.supplier_invoice_number,
     supplier: b.edoslmis_suppliers as unknown as { id: string; name: string } | null,
   }));
   return { data: rows, error: null };
